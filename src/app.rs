@@ -1,14 +1,18 @@
+use regex::Regex;
+
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct MyApp {
     part: String,
+    current_part: String,
 }
 
 impl Default for MyApp {
     fn default() -> Self {
         Self {
             part: "C11702".to_owned(),
+            current_part: "".to_owned(),
         }
     }
 }
@@ -26,6 +30,34 @@ impl MyApp {
         }
 
         Default::default()
+    }
+
+    fn get_part(search_term: &str) -> Option<&str> {
+        let term = search_term.trim();
+        let re_jlc = Regex::new(r"/(C\d+)$").unwrap();
+        let re_lcsc = Regex::new(r"_(C\d+)[^/]*\.html$").unwrap();
+        let mut lcscnumber = "";
+
+        // case one, we got passed a URL
+        if term.contains("http") {
+            if term.contains("jlcpcb.com") {
+                if let Some(captures) = re_jlc.captures(term) {
+                    lcscnumber = captures.get(1).unwrap().as_str(); // safe because index 0
+                }
+            } else if term.contains("lcsc.com") {
+                if let Some(captures) = re_lcsc.captures(term) {
+                    lcscnumber = captures.get(1).unwrap().as_str(); // safe because index 0
+                }
+            }
+        } else if term.starts_with("C") {
+            lcscnumber = term;
+        }
+        if !lcscnumber.is_empty() {
+            return Some(lcscnumber);
+        } else {
+            return None;
+        }
+        // "https://cart.jlcpcb.com/shoppingCart/smtGood/getComponentDetail?componentCode={self.part}"
     }
 }
 
@@ -66,6 +98,12 @@ impl eframe::App for MyApp {
             ui.horizontal(|ui| {
                 ui.label("LCSC number or part URL: ");
                 ui.text_edit_singleline(&mut self.part);
+                ui.label(self.current_part.as_str());
+                if ui.button("Search").clicked() {
+                    if let Some(lcscnumber) = Self::get_part(self.part.as_str()) {
+                        self.current_part = lcscnumber.to_string();
+                    }
+                }
             });
 
             ui.separator();
