@@ -36,3 +36,12 @@ After you have the prerequisites, launch the application and adjust the settings
 
 After entering everything close the program once to save everything.
 The application leverages the save state mechanism of egui to persist your settings.
+
+## What this is NOT
+
+- a full featured LCSC library/component browser
+- a savior which prevents you from overriding stuff you did not want to override
+- a checker that the resulting lib components are actually correct
+
+So, use it as a convenience, but as always: Make sure the output and settings are what you inteneded and what you need!
+
