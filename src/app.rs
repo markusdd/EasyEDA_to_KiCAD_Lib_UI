@@ -1,4 +1,5 @@
-use indexmap::indexmap;
+use egui_extras::{Column, TableBuilder};
+use indexmap::{indexmap, IndexMap};
 use regex::Regex;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
@@ -6,16 +7,17 @@ use regex::Regex;
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct MyApp {
     part: String,
-    current_part: String,
     download_datasheet: bool,
+    #[serde(skip)]
+    current_part: IndexMap<String, String>,
 }
 
 impl Default for MyApp {
     fn default() -> Self {
         Self {
             part: "C11702".to_owned(),
-            current_part: "".to_owned(),
             download_datasheet: true,
+            current_part: indexmap! {},
         }
     }
 }
@@ -35,10 +37,11 @@ impl MyApp {
         Default::default()
     }
 
-    fn get_part(search_term: &str) -> Option<&str> {
+    fn get_part(search_term: &str) -> Option<IndexMap<String, String>> {
         let term = search_term.trim();
         let re_jlc = Regex::new(r"/(C\d+)$").unwrap();
         let re_lcsc = Regex::new(r"_(C\d+)[^/]*\.html$").unwrap();
+        let re_lcscnumber = Regex::new(r"^C(\d+)$").unwrap();
         let mut lcscnumber = "";
 
         // case one, we got passed a URL
@@ -52,45 +55,61 @@ impl MyApp {
                     lcscnumber = captures.get(1).unwrap().as_str();
                 }
             }
+        // case two, it's the number directly
         } else if term.starts_with("C") {
             lcscnumber = term;
         }
-        if !lcscnumber.is_empty() {
+
+        // ensure we only make requests if what we have looks like an LCSC number and can work,
+        // also saves us from urlencoding and such because it will only ever be "C" followed by some numbers
+        if re_lcscnumber.is_match(lcscnumber) {
             let client = reqwest::blocking::Client::new();
-            let res = client
+            let res_or_err = client
                 .get(format!("https://cart.jlcpcb.com/shoppingCart/smtGood/getComponentDetail?componentCode={}", lcscnumber))
                 .header(reqwest::header::ACCEPT, "application/json")
-                .send()
-                .expect("Issue running the GET request to JLCPCB.");
-            let res_status = res.status();
-            if res_status.is_success() {
-                let res_text = res
-                    .text()
-                    .expect("Issue decoding received response from JLCPCB.");
-                let json: serde_json::Value =
-                    serde_json::from_str(&res_text).expect("Issue parsing search result JSON.");
-                println!("{}", json);
-                let parameters = indexmap! {
-                    "componentCode" => "Component code",
-                    "firstTypeNameEn" => "Primary category",
-                    "secondTypeNameEn" => "Secondary category",
-                    "componentBrandEn" => "Brand",
-                    "componentName" => "Full name",
-                    "componentDesignator" => "Designator",
-                    "componentModelEn" => "Model",
-                    "componentSpecificationEn" => "Specification",
-                    "describe" => "Description",
-                    "matchedPartDetail" => "Details",
-                    "stockCount" => "Stock",
-                    "leastNumber" => "Minimal Quantity",
-                    "leastNumberPrice" => "Minimum price",
-                };
+                .send();
+            if let Ok(res) = res_or_err {
+                let res_status = res.status();
+                if res_status.is_success() {
+                    let res_text = res
+                        .text()
+                        .expect("Issue decoding received response from JLCPCB.");
+                    let json: serde_json::Value =
+                        serde_json::from_str(&res_text).expect("Issue parsing search result JSON.");
+                    println!("{}", json);
+                    let parameters = indexmap! {
+                        "componentCode" => "Component Code",
+                        "firstTypeNameEn" => "Primary Category",
+                        "secondTypeNameEn" => "Secondary Category",
+                        "componentBrandEn" => "Brand",
+                        "componentName" => "Full Name",
+                        "componentDesignator" => "Designator",
+                        "componentModelEn" => "Model",
+                        "componentSpecificationEn" => "Specification",
+                        "assemblyProcess" => "Assembly Process",
+                        "describe" => "Description",
+                        "matchedPartDetail" => "Details",
+                        "stockCount" => "Stock",
+                        "leastNumber" => "Minimal Quantity",
+                        "leastNumberPrice" => "Minimum Price",
+                    };
+                    if let Some(data) = json.get("data") {
+                        let mut tabledata = indexmap! {};
+                        for (key, title) in parameters {
+                            if let Some(value) = data.get(key) {
+                                tabledata.insert(
+                                    title.to_owned(),
+                                    value.as_str().unwrap_or("").to_owned(),
+                                );
+                            }
+                        }
+                        return Some(tabledata);
+                    }
+                }
             }
-            return Some(lcscnumber);
-        } else {
-            return None;
         }
-        //
+        // if we fall through to here, we failed getting data somewhere along the way
+        return None;
     }
 }
 
@@ -105,6 +124,13 @@ impl eframe::App for MyApp {
         // Put your widgets into a `SidePanel`, `TopBottomPanel`, `CentralPanel`, `Window` or `Area`.
         // For inspiration and more examples, go to https://emilk.github.io/egui
         let is_web = cfg!(target_arch = "wasm32");
+
+        // on startup the current_part IndexMap is empty even if a part is set, so we populate it
+        if self.current_part.is_empty() && !self.part.is_empty() {
+            if let Some(tabledata) = Self::get_part(self.part.as_str()) {
+                self.current_part = tabledata;
+            }
+        }
 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             // The top panel is often a good place for a menu bar:
@@ -134,16 +160,46 @@ impl eframe::App for MyApp {
                 ui.label("LCSC number or part URL: ");
                 ui.text_edit_singleline(&mut self.part);
                 if ui.button("Search").clicked() {
-                    if let Some(lcscnumber) = Self::get_part(self.part.as_str()) {
-                        self.current_part = lcscnumber.to_string();
+                    if let Some(tabledata) = Self::get_part(self.part.as_str()) {
+                        self.current_part = tabledata;
                     }
                 }
-                ui.label(format!("Current Part: {}", self.current_part.as_str()));
+                ui.label(format!(
+                    "Current Part: {}",
+                    self.current_part
+                        .get("Component Code")
+                        .unwrap_or(&"".to_owned())
+                ));
             });
 
             ui.separator();
 
-            //ui.add();
+            TableBuilder::new(ui)
+                .striped(true)
+                .resizable(true)
+                .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
+                .column(Column::initial(170.0).at_least(90.0))
+                .column(Column::initial(400.0).at_least(170.0))
+                .header(20.0, |mut header| {
+                    header.col(|ui| {
+                        ui.heading("Parameter");
+                    });
+                    header.col(|ui| {
+                        ui.heading("Value");
+                    });
+                })
+                .body(|mut body| {
+                    for (key, value) in &self.current_part {
+                        body.row(15.0, |mut row| {
+                            row.col(|ui| {
+                                ui.label(key);
+                            });
+                            row.col(|ui| {
+                                ui.label(value);
+                            });
+                        });
+                    }
+                });
 
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
                 powered_by(ui);
