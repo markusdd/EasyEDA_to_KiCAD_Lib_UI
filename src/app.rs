@@ -17,6 +17,8 @@ pub struct MyApp {
     model_dir: String,
     download_datasheet: bool,
     skip_existing: bool,
+    no_footprint: bool,
+    no_symbol: bool,
     #[serde(skip)]
     settings_open: bool,
     #[serde(skip)]
@@ -39,6 +41,8 @@ impl Default for MyApp {
             model_dir: "packages3d".to_owned(),
             download_datasheet: true,
             skip_existing: false,
+            no_footprint: false,
+            no_symbol: false,
             settings_open: false,
             is_init: false,
             search_good: true,
@@ -101,7 +105,7 @@ impl MyApp {
                         .expect("Issue decoding received response from JLCPCB.");
                     let json: serde_json::Value =
                         serde_json::from_str(&res_text).expect("Issue parsing search result JSON.");
-                    println!("{}", json);
+                    // only debug: println!("{}", json);
                     let parameters = indexmap! {
                         "componentCode" => "Component Code",
                         "firstTypeNameEn" => "Primary Category",
@@ -253,6 +257,7 @@ impl eframe::App for MyApp {
                     ui.label("LCSC number or part URL: ");
                     ui.add(TextEdit::singleline(&mut self.part).desired_width(800.0));
                     if ui.button("Search").clicked() {
+                        self.part = self.part.trim().to_owned();
                         if let Some(tabledata) = Self::get_part(self.part.as_str()) {
                             self.current_part = tabledata;
                             self.search_good = true;
@@ -270,7 +275,31 @@ impl eframe::App for MyApp {
                                 .unwrap_or(&"".to_owned())
                         ));
                         if ui.button("Add to Library").clicked() {
-                            Exec::cmd(&self.exe_path).popen();
+                            if let Some(curr_part) = self.current_part.get("Component Code") {
+                                let mut args = vec![
+                                    curr_part,
+                                    "-dir",
+                                    &self.output_path,
+                                    "-symbol_lib",
+                                    &self.symbol_lib,
+                                    "-symbol_lib_dir",
+                                    &self.symbol_lib_dir,
+                                    "-footprint_lib",
+                                    &self.footprint_lib,
+                                    "-model_dir",
+                                    &self.model_dir,
+                                ];
+                                if self.skip_existing {
+                                    args.push("--skip_existing");
+                                }
+                                if self.no_footprint {
+                                    args.push("--no_footprint");
+                                }
+                                if self.no_symbol {
+                                    args.push("--no_symbol");
+                                }
+                                Exec::cmd(&self.exe_path).args(&args).popen();
+                            }
                         }
                     } else {
                         ui.label("No such part found. Check part number or URL!");
@@ -372,6 +401,8 @@ impl eframe::App for MyApp {
                             ui.heading("Settings");
                             ui.checkbox(&mut self.download_datasheet, "Download datasheet");
                             ui.checkbox(&mut self.skip_existing, "Skip existing components");
+                            ui.checkbox(&mut self.no_footprint, "Skip footprint generation");
+                            ui.checkbox(&mut self.no_symbol, "Skip symbol generation");
                             ui.label("Path of JLC2KiCadLib executable:");
                             ui.add(TextEdit::singleline(&mut self.exe_path).desired_width(800.0));
                             ui.label("Output directory for the generated library:");
