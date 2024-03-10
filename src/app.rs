@@ -1,3 +1,4 @@
+use egui::TextEdit;
 use egui_extras::{Column, TableBuilder};
 use indexmap::{indexmap, IndexMap};
 use regex::Regex;
@@ -93,15 +94,65 @@ impl MyApp {
                         "leastNumber" => "Minimal Quantity",
                         "leastNumberPrice" => "Minimum Price",
                     };
+
+                    // if the data section is there as expected, we start taking it apart
                     if let Some(data) = json.get("data") {
-                        let mut tabledata = indexmap! {};
+                        let mut tabledata: IndexMap<String, String> = indexmap! {};
+
+                        // determine if it is a JLCPCB basic or extended assembly part
+                        if let Some(parttype) = data.get("componentLibraryType") {
+                            if parttype == "base" {
+                                tabledata.insert("Type".to_owned(), "Basic".to_owned());
+                            } else if parttype == "expand" {
+                                tabledata.insert("Type".to_owned(), "Extended".to_owned());
+                            }
+                        }
+
+                        // now pretty-format the parameters that should always be there
                         for (key, title) in parameters {
                             if let Some(value) = data.get(key) {
                                 tabledata.insert(
                                     title.to_owned(),
-                                    value.as_str().unwrap_or("").to_owned(),
+                                    value.to_string().trim_matches('"').to_owned(),
                                 );
                             }
+                        }
+
+                        // now the component specific attributes, these are in a nested array within
+                        // the JSON and vary by component
+                        if let Some(attributes) = data.get("attributes") {
+                            if let Some(array) = attributes.as_array() {
+                                for attribute in array {
+                                    if let Some(name) = attribute.get("attribute_name_en") {
+                                        if let Some(value) = attribute.get("attribute_value_name") {
+                                            tabledata.insert(
+                                                name.to_string().trim_matches('"').to_owned(),
+                                                value.to_string().trim_matches('"').to_owned(),
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // here we gather metadata for the image and datasheet URLs
+                        if let Some(imagelist) = data.get("imageList") {
+                            if let Some(imagevec) = imagelist.as_array() {
+                                for (idx, i) in imagevec.iter().enumerate() {
+                                    if let Some(imageurl) = i.get("productBigImage") {
+                                        tabledata.insert(
+                                            format!("meta_image{}", idx),
+                                            imageurl.to_string().trim_matches('"').to_owned(),
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                        if let Some(datasheeturl) = data.get("dataManualUrl") {
+                            tabledata.insert(
+                                "meta_datasheeturl".to_owned(),
+                                datasheeturl.to_string().trim_matches('"').to_owned(),
+                            );
                         }
                         return Some(tabledata);
                     }
@@ -156,50 +207,58 @@ impl eframe::App for MyApp {
                 ui.heading("EasyEDA to KiCAD Library Converter");
             }
 
-            ui.horizontal(|ui| {
-                ui.label("LCSC number or part URL: ");
-                ui.text_edit_singleline(&mut self.part);
-                if ui.button("Search").clicked() {
-                    if let Some(tabledata) = Self::get_part(self.part.as_str()) {
-                        self.current_part = tabledata;
+            ui.vertical(|ui| {
+                ui.horizontal(|ui| {
+                    ui.label("LCSC number or part URL: ");
+                    ui.add(TextEdit::singleline(&mut self.part).desired_width(800.0));
+                    if ui.button("Search").clicked() {
+                        if let Some(tabledata) = Self::get_part(self.part.as_str()) {
+                            self.current_part = tabledata;
+                        }
                     }
-                }
-                ui.label(format!(
-                    "Current Part: {}",
-                    self.current_part
-                        .get("Component Code")
-                        .unwrap_or(&"".to_owned())
-                ));
+                });
+                ui.horizontal(|ui| {
+                    ui.label(format!(
+                        "Current Part: {}",
+                        self.current_part
+                            .get("Component Code")
+                            .unwrap_or(&"".to_owned())
+                    ));
+                });
             });
 
             ui.separator();
 
-            TableBuilder::new(ui)
-                .striped(true)
-                .resizable(true)
-                .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
-                .column(Column::initial(170.0).at_least(90.0))
-                .column(Column::initial(400.0).at_least(170.0))
-                .header(20.0, |mut header| {
-                    header.col(|ui| {
-                        ui.heading("Parameter");
-                    });
-                    header.col(|ui| {
-                        ui.heading("Value");
-                    });
-                })
-                .body(|mut body| {
-                    for (key, value) in &self.current_part {
-                        body.row(15.0, |mut row| {
-                            row.col(|ui| {
-                                ui.label(key);
-                            });
-                            row.col(|ui| {
-                                ui.label(value);
-                            });
+            ui.vertical(|ui| {
+                TableBuilder::new(ui)
+                    .striped(true)
+                    .resizable(true)
+                    .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
+                    .column(Column::initial(170.0).at_least(90.0))
+                    .column(Column::initial(400.0).at_least(170.0))
+                    .header(20.0, |mut header| {
+                        header.col(|ui| {
+                            ui.heading("Parameter");
                         });
-                    }
-                });
+                        header.col(|ui| {
+                            ui.heading("Value");
+                        });
+                    })
+                    .body(|mut body| {
+                        for (key, value) in &self.current_part {
+                            body.row(15.0, |mut row| {
+                                row.col(|ui| {
+                                    ui.label(key);
+                                });
+                                row.col(|ui| {
+                                    ui.label(value);
+                                });
+                            });
+                        }
+                    });
+            });
+
+            ui.separator();
 
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
                 powered_by(ui);
