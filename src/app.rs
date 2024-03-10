@@ -15,6 +15,7 @@ pub struct MyApp {
     symbol_lib_dir: String,
     footprint_lib: String,
     model_dir: String,
+    datasheet_dir: String,
     download_datasheet: bool,
     skip_existing: bool,
     no_footprint: bool,
@@ -39,6 +40,7 @@ impl Default for MyApp {
             symbol_lib_dir: "symbol".to_owned(),
             footprint_lib: "footprint".to_owned(),
             model_dir: "packages3d".to_owned(),
+            datasheet_dir: "~/kicad_libs/datasheets".to_owned(),
             download_datasheet: true,
             skip_existing: false,
             no_footprint: false,
@@ -405,7 +407,7 @@ impl eframe::App for MyApp {
                             ui.checkbox(&mut self.no_symbol, "Skip symbol generation");
                             ui.label("Path of JLC2KiCadLib executable:");
                             ui.add(TextEdit::singleline(&mut self.exe_path).desired_width(800.0));
-                            ui.label("Output directory for the generated library:");
+                            ui.label("Output directory for the generated library (absolute path):");
                             ui.add(
                                 TextEdit::singleline(&mut self.output_path).desired_width(800.0),
                             );
@@ -427,6 +429,10 @@ impl eframe::App for MyApp {
                                 "Name of the 3D model directory (relative to footprint directory):",
                             );
                             ui.add(TextEdit::singleline(&mut self.model_dir).desired_width(800.0));
+                            ui.label("Output directory for downloaded datasheets (absolute path):");
+                            ui.add(
+                                TextEdit::singleline(&mut self.datasheet_dir).desired_width(800.0),
+                            );
                             if ui.button("Close").clicked() {
                                 self.settings_open = false;
                             }
