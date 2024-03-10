@@ -10,7 +10,15 @@ use subprocess::Exec;
 pub struct MyApp {
     part: String,
     exe_path: String,
+    output_path: String,
+    symbol_lib: String,
+    symbol_lib_dir: String,
+    footprint_lib: String,
+    model_dir: String,
     download_datasheet: bool,
+    skip_existing: bool,
+    #[serde(skip)]
+    settings_open: bool,
     #[serde(skip)]
     is_init: bool,
     #[serde(skip)]
@@ -24,7 +32,14 @@ impl Default for MyApp {
         Self {
             part: "C11702".to_owned(),
             exe_path: "JLC2KiCadLib".to_owned(),
+            output_path: "~/kicad_libs/".to_owned(),
+            symbol_lib: "default_lib".to_owned(),
+            symbol_lib_dir: "symbol".to_owned(),
+            footprint_lib: "footprint".to_owned(),
+            model_dir: "packages3d".to_owned(),
             download_datasheet: true,
+            skip_existing: false,
+            settings_open: false,
             is_init: false,
             search_good: true,
             current_part: indexmap! {},
@@ -210,14 +225,17 @@ impl eframe::App for MyApp {
 
             egui::menu::bar(ui, |ui| {
                 // NOTE: no File->Quit on web pages!
-                if !is_web {
-                    ui.menu_button("File", |ui| {
+                ui.menu_button("File", |ui| {
+                    if ui.button("Settings").clicked() {
+                        self.settings_open = true;
+                    }
+                    if !is_web {
                         if ui.button("Quit").clicked() {
                             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                         }
-                    });
-                    ui.add_space(16.0);
-                }
+                    }
+                });
+                ui.add_space(16.0);
 
                 egui::widgets::global_dark_light_mode_buttons(ui);
             });
@@ -339,23 +357,51 @@ impl eframe::App for MyApp {
 
             ui.separator();
 
-            ui.vertical(|ui| {
-                ui.heading("Settings");
-                ui.horizontal(|ui| {
-                    ui.checkbox(&mut self.download_datasheet, "Download Datasheet");
-                });
-                ui.horizontal(|ui| {
-                    ui.label("Path of JLC2KiCadLib executable:");
-                    ui.add(TextEdit::singleline(&mut self.exe_path).desired_width(800.0));
-                });
-            });
-
-            ui.separator();
-
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
                 powered_by(ui);
                 egui::warn_if_debug_build(ui);
             });
+
+            //settings window
+            if self.settings_open {
+                Window::new("Settings")
+                    .auto_sized()
+                    .interactable(true)
+                    .show(ctx, |ui| {
+                        ui.vertical(|ui| {
+                            ui.heading("Settings");
+                            ui.checkbox(&mut self.download_datasheet, "Download datasheet");
+                            ui.checkbox(&mut self.skip_existing, "Skip existing components");
+                            ui.label("Path of JLC2KiCadLib executable:");
+                            ui.add(TextEdit::singleline(&mut self.exe_path).desired_width(800.0));
+                            ui.label("Output directory for the generated library:");
+                            ui.add(
+                                TextEdit::singleline(&mut self.output_path).desired_width(800.0),
+                            );
+                            ui.label(
+                                "Name of the symbol directory (relative to output directory):",
+                            );
+                            ui.add(
+                                TextEdit::singleline(&mut self.symbol_lib_dir).desired_width(800.0),
+                            );
+                            ui.label(
+                                "Name of the footprint library (relative to output directory):",
+                            );
+                            ui.add(
+                                TextEdit::singleline(&mut self.footprint_lib).desired_width(800.0),
+                            );
+                            ui.label("Name of the symbol library:");
+                            ui.add(TextEdit::singleline(&mut self.symbol_lib).desired_width(800.0));
+                            ui.label(
+                                "Name of the 3D model directory (relative to footprint directory):",
+                            );
+                            ui.add(TextEdit::singleline(&mut self.model_dir).desired_width(800.0));
+                            if ui.button("Close").clicked() {
+                                self.settings_open = false;
+                            }
+                        });
+                    });
+            }
         });
     }
 }
