@@ -10,6 +10,8 @@ pub struct MyApp {
     part: String,
     download_datasheet: bool,
     #[serde(skip)]
+    is_init: bool,
+    #[serde(skip)]
     current_part: IndexMap<String, String>,
 }
 
@@ -18,6 +20,7 @@ impl Default for MyApp {
         Self {
             part: "C11702".to_owned(),
             download_datasheet: true,
+            is_init: false,
             current_part: indexmap! {},
         }
     }
@@ -177,10 +180,11 @@ impl eframe::App for MyApp {
         let is_web = cfg!(target_arch = "wasm32");
 
         // on startup the current_part IndexMap is empty even if a part is set, so we populate it
-        if self.current_part.is_empty() && !self.part.is_empty() {
+        if !self.is_init && self.current_part.is_empty() && !self.part.is_empty() {
             if let Some(tabledata) = Self::get_part(self.part.as_str()) {
                 self.current_part = tabledata;
             }
+            self.is_init = true
         }
 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
@@ -246,14 +250,38 @@ impl eframe::App for MyApp {
                     })
                     .body(|mut body| {
                         for (key, value) in &self.current_part {
-                            body.row(15.0, |mut row| {
-                                row.col(|ui| {
-                                    ui.label(key);
+                            if !key.starts_with("meta_") {
+                                body.row(15.0, |mut row| {
+                                    row.col(|ui| {
+                                        ui.label(key);
+                                    });
+                                    row.col(|ui| {
+                                        ui.label(value);
+                                        if key == "Component Code" {
+                                            ui.hyperlink_to(
+                                                "LCSC",
+                                                format!(
+                                                    "https://www.lcsc.com/product-detail/{}.html",
+                                                    value
+                                                ),
+                                            );
+                                            ui.hyperlink_to(
+                                                "JLCPCB",
+                                                format!("https://jlcpcb.com/partdetail/{}", value),
+                                            );
+                                        }
+                                    });
                                 });
-                                row.col(|ui| {
-                                    ui.label(value);
+                            } else if key.starts_with("meta_datasheeturl") {
+                                body.row(15.0, |mut row| {
+                                    row.col(|ui| {
+                                        ui.label("Datasheet");
+                                    });
+                                    row.col(|ui| {
+                                        ui.hyperlink(value);
+                                    });
                                 });
-                            });
+                            }
                         }
                     });
             });
