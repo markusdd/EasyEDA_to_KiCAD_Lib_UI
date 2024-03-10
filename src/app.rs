@@ -1,16 +1,20 @@
-use egui::TextEdit;
+use egui::{TextEdit, Vec2, Window};
 use egui_extras::{Column, TableBuilder};
 use indexmap::{indexmap, IndexMap};
 use regex::Regex;
+use subprocess::Exec;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct MyApp {
     part: String,
+    exe_path: String,
     download_datasheet: bool,
     #[serde(skip)]
     is_init: bool,
+    #[serde(skip)]
+    search_good: bool,
     #[serde(skip)]
     current_part: IndexMap<String, String>,
 }
@@ -19,8 +23,10 @@ impl Default for MyApp {
     fn default() -> Self {
         Self {
             part: "C11702".to_owned(),
+            exe_path: "JLC2KiCadLib".to_owned(),
             download_datasheet: true,
             is_init: false,
+            search_good: true,
             current_part: indexmap! {},
         }
     }
@@ -97,6 +103,15 @@ impl MyApp {
                         "leastNumber" => "Minimal Quantity",
                         "leastNumberPrice" => "Minimum Price",
                     };
+
+                    // there is a case where we get a fully valid response in an HTML
+                    // and JSON sense but it tells us via a code field in the JSON
+                    // that no part could be found, in that case we exit early
+                    if let Some(code) = json.get("code") {
+                        if code != 200 {
+                            return None;
+                        }
+                    }
 
                     // if the data section is there as expected, we start taking it apart
                     if let Some(data) = json.get("data") {
@@ -183,6 +198,9 @@ impl eframe::App for MyApp {
         if !self.is_init && self.current_part.is_empty() && !self.part.is_empty() {
             if let Some(tabledata) = Self::get_part(self.part.as_str()) {
                 self.current_part = tabledata;
+                self.search_good = true;
+            } else {
+                self.search_good = false;
             }
             self.is_init = true
         }
@@ -210,6 +228,7 @@ impl eframe::App for MyApp {
             if is_web {
                 ui.heading("EasyEDA to KiCAD Library Converter");
             }
+            let mut imagevec = vec![];
 
             ui.vertical(|ui| {
                 ui.horizontal(|ui| {
@@ -218,16 +237,26 @@ impl eframe::App for MyApp {
                     if ui.button("Search").clicked() {
                         if let Some(tabledata) = Self::get_part(self.part.as_str()) {
                             self.current_part = tabledata;
+                            self.search_good = true;
+                        } else {
+                            self.search_good = false;
                         }
                     }
                 });
                 ui.horizontal(|ui| {
-                    ui.label(format!(
-                        "Current Part: {}",
-                        self.current_part
-                            .get("Component Code")
-                            .unwrap_or(&"".to_owned())
-                    ));
+                    if self.search_good {
+                        ui.label(format!(
+                            "Current Part: {}",
+                            self.current_part
+                                .get("Component Code")
+                                .unwrap_or(&"".to_owned())
+                        ));
+                        if ui.button("Add to Library").clicked() {
+                            Exec::cmd(&self.exe_path).popen();
+                        }
+                    } else {
+                        ui.label("No such part found. Check part number or URL!");
+                    }
                 });
             });
 
@@ -281,9 +310,44 @@ impl eframe::App for MyApp {
                                         ui.hyperlink(value);
                                     });
                                 });
+                            } else if key.starts_with("meta_image") {
+                                imagevec.push(value);
                             }
                         }
                     });
+
+                ui.separator();
+
+                ui.horizontal(|ui| {
+                    for url in imagevec {
+                        let img = ui
+                            .add(egui::Image::new(url).fit_to_exact_size(Vec2::new(200.0, 200.0)));
+                        if img.hovered() {
+                            Window::new("")
+                                .auto_sized()
+                                .interactable(false)
+                                .show(ctx, |ui| {
+                                    ui.add(
+                                        egui::Image::new(url)
+                                            .fit_to_exact_size(Vec2::new(900.0, 900.0)),
+                                    );
+                                });
+                        }
+                    }
+                });
+            });
+
+            ui.separator();
+
+            ui.vertical(|ui| {
+                ui.heading("Settings");
+                ui.horizontal(|ui| {
+                    ui.checkbox(&mut self.download_datasheet, "Download Datasheet");
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Path of JLC2KiCadLib executable:");
+                    ui.add(TextEdit::singleline(&mut self.exe_path).desired_width(800.0));
+                });
             });
 
             ui.separator();
