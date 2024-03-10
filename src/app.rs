@@ -1,3 +1,4 @@
+use indexmap::indexmap;
 use regex::Regex;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
@@ -6,6 +7,7 @@ use regex::Regex;
 pub struct MyApp {
     part: String,
     current_part: String,
+    download_datasheet: bool,
 }
 
 impl Default for MyApp {
@@ -13,6 +15,7 @@ impl Default for MyApp {
         Self {
             part: "C11702".to_owned(),
             current_part: "".to_owned(),
+            download_datasheet: true,
         }
     }
 }
@@ -42,22 +45,52 @@ impl MyApp {
         if term.contains("http") {
             if term.contains("jlcpcb.com") {
                 if let Some(captures) = re_jlc.captures(term) {
-                    lcscnumber = captures.get(1).unwrap().as_str(); // safe because index 0
+                    lcscnumber = captures.get(1).unwrap().as_str();
                 }
             } else if term.contains("lcsc.com") {
                 if let Some(captures) = re_lcsc.captures(term) {
-                    lcscnumber = captures.get(1).unwrap().as_str(); // safe because index 0
+                    lcscnumber = captures.get(1).unwrap().as_str();
                 }
             }
         } else if term.starts_with("C") {
             lcscnumber = term;
         }
         if !lcscnumber.is_empty() {
+            let client = reqwest::blocking::Client::new();
+            let res = client
+                .get(format!("https://cart.jlcpcb.com/shoppingCart/smtGood/getComponentDetail?componentCode={}", lcscnumber))
+                .header(reqwest::header::ACCEPT, "application/json")
+                .send()
+                .expect("Issue running the GET request to JLCPCB.");
+            let res_status = res.status();
+            if res_status.is_success() {
+                let res_text = res
+                    .text()
+                    .expect("Issue decoding received response from JLCPCB.");
+                let json: serde_json::Value =
+                    serde_json::from_str(&res_text).expect("Issue parsing search result JSON.");
+                println!("{}", json);
+                let parameters = indexmap! {
+                    "componentCode" => "Component code",
+                    "firstTypeNameEn" => "Primary category",
+                    "secondTypeNameEn" => "Secondary category",
+                    "componentBrandEn" => "Brand",
+                    "componentName" => "Full name",
+                    "componentDesignator" => "Designator",
+                    "componentModelEn" => "Model",
+                    "componentSpecificationEn" => "Specification",
+                    "describe" => "Description",
+                    "matchedPartDetail" => "Details",
+                    "stockCount" => "Stock",
+                    "leastNumber" => "Minimal Quantity",
+                    "leastNumberPrice" => "Minimum price",
+                };
+            }
             return Some(lcscnumber);
         } else {
             return None;
         }
-        // "https://cart.jlcpcb.com/shoppingCart/smtGood/getComponentDetail?componentCode={self.part}"
+        //
     }
 }
 
@@ -71,13 +104,13 @@ impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Put your widgets into a `SidePanel`, `TopBottomPanel`, `CentralPanel`, `Window` or `Area`.
         // For inspiration and more examples, go to https://emilk.github.io/egui
+        let is_web = cfg!(target_arch = "wasm32");
 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             // The top panel is often a good place for a menu bar:
 
             egui::menu::bar(ui, |ui| {
                 // NOTE: no File->Quit on web pages!
-                let is_web = cfg!(target_arch = "wasm32");
                 if !is_web {
                     ui.menu_button("File", |ui| {
                         if ui.button("Quit").clicked() {
@@ -93,17 +126,19 @@ impl eframe::App for MyApp {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             // The central panel the region left after adding TopPanel's and SidePanel's
-            ui.heading("EasyEDA to KiCAD Library Converter");
+            if is_web {
+                ui.heading("EasyEDA to KiCAD Library Converter");
+            }
 
             ui.horizontal(|ui| {
                 ui.label("LCSC number or part URL: ");
                 ui.text_edit_singleline(&mut self.part);
-                ui.label(self.current_part.as_str());
                 if ui.button("Search").clicked() {
                     if let Some(lcscnumber) = Self::get_part(self.part.as_str()) {
                         self.current_part = lcscnumber.to_string();
                     }
                 }
+                ui.label(format!("Current Part: {}", self.current_part.as_str()));
             });
 
             ui.separator();
