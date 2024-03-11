@@ -24,6 +24,9 @@ serde_json = "1.0.114"
 regex = "1.10.3"
 indexmap = "2.2.5"
 downloader = "0.2.7"
+tempdir = "0.3.7"
+glob = "0.3.1"
+arboard = "3.3.2"
 
 # You only need serde if you want app persistence:
 serde = { version = "1", features = ["derive"] }

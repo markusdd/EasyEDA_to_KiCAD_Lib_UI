@@ -1,11 +1,17 @@
-use std::{fs::create_dir_all, path::Path};
+use std::{
+    fs::{create_dir_all, read_to_string},
+    path::Path,
+};
 
+use arboard::Clipboard;
 use downloader::{Download, Downloader};
 use egui::{TextEdit, Vec2, Window};
 use egui_extras::{Column, TableBuilder};
+use glob::glob;
 use indexmap::{indexmap, IndexMap};
 use regex::Regex;
 use subprocess::Exec;
+use tempdir::TempDir;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -23,6 +29,8 @@ pub struct MyApp {
     skip_existing: bool,
     no_footprint: bool,
     no_symbol: bool,
+    #[serde(skip)]
+    tempdir: Option<TempDir>,
     #[serde(skip)]
     settings_open: bool,
     #[serde(skip)]
@@ -48,6 +56,7 @@ impl Default for MyApp {
             skip_existing: false,
             no_footprint: false,
             no_symbol: false,
+            tempdir: TempDir::new("easyedatokicadlib").ok(),
             settings_open: false,
             is_init: false,
             search_good: true,
@@ -316,6 +325,58 @@ impl eframe::App for MyApp {
                                             .ok();
                                         if let Some(mut dl) = dl {
                                             let _ = dl.download(&[Download::new(url)]);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        // in the rare case the temp dir cannot be created or isn't a UTF8 path,
+                        // we just do not render the button
+                        if let Some(tempdir) = &self.tempdir {
+                            if let Some(tempdirstr) = tempdir.path().as_os_str().to_str() {
+                                if ui.button("Copy Footprint").clicked() {
+                                    if let Some(curr_part) = self.current_part.get("Component Code")
+                                    {
+                                        println!(
+                                            "Temporary Directory for Footprint: {}",
+                                            tempdirstr
+                                        );
+                                        let args = vec![
+                                            curr_part,
+                                            "--no_symbol",
+                                            "-dir",
+                                            tempdirstr,
+                                            "-footprint_lib",
+                                            curr_part,
+                                            "-model_dir",
+                                            "packages3d",
+                                        ];
+                                        let _ = Exec::cmd(&self.exe_path).args(&args).popen();
+
+                                        // now copy the generated footprint to the clipboard
+                                        let glob = glob(
+                                            format!("{}/{}/*.kicad_mod", tempdirstr, curr_part)
+                                                .as_str(),
+                                        )
+                                        .ok();
+                                        if let Some(paths) = glob {
+                                            for p in paths {
+                                                match p {
+                                                    Ok(path) => {
+                                                        if let Some(mut clipboard) =
+                                                            Clipboard::new().ok()
+                                                        {
+                                                            if let Some(contents) =
+                                                                read_to_string(path).ok()
+                                                            {
+                                                                let _ =
+                                                                    clipboard.set_text(contents);
+                                                            }
+                                                        }
+                                                    }
+                                                    Err(e) => println!("{:?}", e),
+                                                }
+                                            }
                                         }
                                     }
                                 }
