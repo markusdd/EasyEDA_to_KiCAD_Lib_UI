@@ -22,6 +22,11 @@ of the pictures LCSC provides of the parts. If you hover over them, you get the 
 And it gives you the option to directly open the parts pages, access the datasheet URL (if there is one) and
 also save the datasheet in addition to the library conversion.
 
+When using the 'Copy Footprint' button it will download just the footprint and 3D model for the part into a
+temporary directory and send it to the clipboard so you can just paste it via Ctrl+V into the KiCAD PCB editor
+to check it out and also view the 3d model. The temporary folder will vanish once the application is closed,
+so if you commit to using the part use the "Add to Library" function to permanently add it.
+
 ## How to get going
 
 You can clone this repository and just run `cargo build --release`, provided you have rust installed (use `rustup`, it's easy).
