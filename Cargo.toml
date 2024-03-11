@@ -1,6 +1,6 @@
 [package]
 name = "easyeda_to_kicad_lib_ui"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["Markus Krause <Krause.Markus@gmx.com>"]
 edition = "2021"
 rust-version = "1.72"
