@@ -8,7 +8,7 @@ fn main() -> eframe::Result<()> {
 
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1024.0, 768.0])
+            .with_inner_size([1024.0, 1000.0])
             .with_min_inner_size([300.0, 220.0])
             .with_title("EasyEDA to KiCAD Library UI")
             .with_icon(

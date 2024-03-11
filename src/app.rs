@@ -1,3 +1,6 @@
+use std::{fs::create_dir_all, path::Path};
+
+use downloader::{Download, Downloader};
 use egui::{TextEdit, Vec2, Window};
 use egui_extras::{Column, TableBuilder};
 use indexmap::{indexmap, IndexMap};
@@ -300,7 +303,22 @@ impl eframe::App for MyApp {
                                 if self.no_symbol {
                                     args.push("--no_symbol");
                                 }
-                                Exec::cmd(&self.exe_path).args(&args).popen();
+                                let _ = Exec::cmd(&self.exe_path).args(&args).popen();
+                                if self.download_datasheet {
+                                    let dlpath = Path::new(&self.datasheet_dir);
+                                    if !dlpath.is_dir() {
+                                        let _ = create_dir_all(dlpath);
+                                    }
+                                    if let Some(url) = self.current_part.get("meta_datasheeturl") {
+                                        let dl = Downloader::builder()
+                                            .download_folder(&dlpath)
+                                            .build()
+                                            .ok();
+                                        if let Some(mut dl) = dl {
+                                            let _ = dl.download(&[Download::new(url)]);
+                                        }
+                                    }
+                                }
                             }
                         }
                     } else {
