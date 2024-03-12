@@ -48,5 +48,5 @@ The application leverages the save state mechanism of egui to persist your setti
 - a savior which prevents you from overriding stuff you did not want to override
 - a checker that the resulting lib components are actually correct
 
-So, use it as a convenience, but as always: Make sure the output and settings are what you inteneded and what you need!
+So, use it as a convenience, but as always: Make sure the output and settings are what you intended and what you need!
 
