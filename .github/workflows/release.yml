@@ -77,7 +77,6 @@ jobs:
           name: ${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-${{ matrix.target }}
           path: ./target/release/easyeda_to_kicad_lib_ui${{ matrix.suffix }}
   release:
-    if: github.ref == 'refs/heads/master'
     needs:
       - build
     runs-on: ubuntu-latest
