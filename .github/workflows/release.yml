@@ -91,7 +91,7 @@ jobs:
         with:
           name: version
       - id: get_version
-        run: 'echo ::set-output name=VERSION::$(cat ./version/version)'
+        run: 'echo "VERSION=$(cat ./version/version)" >> $GITHUB_OUTPUT'
         shell: bash
       - uses: actions/download-artifact@master
         with:
