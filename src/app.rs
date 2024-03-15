@@ -13,6 +13,8 @@ use regex::Regex;
 use subprocess::Exec;
 use tempdir::TempDir;
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
@@ -475,6 +477,7 @@ impl eframe::App for MyApp {
 
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
                 powered_by(ui);
+                ui.label(format!("Version: v{}", VERSION));
                 egui::warn_if_debug_build(ui);
             });
 

@@ -48,15 +48,15 @@ jobs:
       - id: get_version
         run: echo "VERSION=$(cat ./version/version)" >> $GITHUB_OUTPUT
         shell: bash
-      - uses: actions/cache@v1
+      - uses: actions/cache@master
         with:
           path: ~/.cargo/registry
           key: '${{ runner.os }}-cargo-registry-${{ hashFiles(''**/Cargo.lock'') }}'
-      - uses: actions/cache@v1
+      - uses: actions/cache@master
         with:
           path: ~/.cargo/git
           key: '${{ runner.os }}-cargo-index-${{ hashFiles(''**/Cargo.lock'') }}'
-      - uses: actions/cache@v1
+      - uses: actions/cache@master
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
@@ -117,7 +117,7 @@ jobs:
           toolchain: stable
           override: true
       - id: create_release
-        uses: actions/create-release@v1.0.0
+        uses: actions/create-release@latest
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         with:
@@ -125,7 +125,7 @@ jobs:
           release_name: 'Release ${{ steps.get_version.outputs.VERSION }}'
           draft: false
           prerelease: false
-      - uses: actions/upload-release-asset@v1.0.1
+      - uses: actions/upload-release-asset@latest
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         with:
@@ -133,7 +133,7 @@ jobs:
           asset_path: ./${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-x86_64-unknown-linux-gnu/easyeda_to_kicad_lib_ui
           asset_name: ${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-x86_64-unknown-linux-gnu
           asset_content_type: application/octet-stream
-      - uses: actions/upload-release-asset@v1.0.1
+      - uses: actions/upload-release-asset@latest
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         with:
@@ -141,7 +141,7 @@ jobs:
           asset_path: ./${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-x86_64-apple-darwin/easyeda_to_kicad_lib_ui
           asset_name: ${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-x86_64-apple-darwin
           asset_content_type: application/octet-stream
-      - uses: actions/upload-release-asset@v1.0.1
+      - uses: actions/upload-release-asset@latest
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         with:
@@ -149,7 +149,7 @@ jobs:
           asset_path: ./${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-aarch64-apple-darwin/easyeda_to_kicad_lib_ui
           asset_name: ${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-aarch64-apple-darwin
           asset_content_type: application/octet-stream
-      - uses: actions/upload-release-asset@v1.0.1
+      - uses: actions/upload-release-asset@latest
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         with:
