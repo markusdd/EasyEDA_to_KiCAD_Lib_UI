@@ -66,17 +66,6 @@ jobs:
           toolchain: stable
           override: true
       - uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: 'toml-cli'
-      - shell: bash
-        env:
-          VERSION: '${{ steps.get_version.outputs.VERSION }}'
-        run: |
-          TEMP_FILE="$(mktemp)"
-          toml set Cargo.toml package.version "${VERSION:1}" > "$TEMP_FILE"
-          mv "$TEMP_FILE" Cargo.toml
-      - uses: actions-rs/cargo@v1
         env:
           VERSION: '${{ steps.get_version.outputs.VERSION }}'
           REPOSITORY_NAME: '${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}'
