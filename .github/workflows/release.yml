@@ -90,6 +90,7 @@ jobs:
       - uses: actions/download-artifact@master
         with:
           name: version
+      - run: ls -lah
       - id: get_version
         run: 'echo "VERSION=$(cat ./version/version)" >> $GITHUB_OUTPUT'
         shell: bash
