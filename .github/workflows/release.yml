@@ -72,6 +72,8 @@ jobs:
         with:
           command: build
           args: '--release'
+      - id: check_path_contents 
+        run: ls -lah .
       - uses: actions/upload-artifact@master
         with:
           name: ${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-${{ matrix.target }}
