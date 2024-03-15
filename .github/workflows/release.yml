@@ -106,6 +106,7 @@ jobs:
       - uses: actions/download-artifact@master
         with:
           name: ${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-x86_64-pc-windows-msvc
+      - run: ls -lah
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
