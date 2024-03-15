@@ -74,6 +74,9 @@ jobs:
           args: '--release'
       - id: check_path_contents 
         run: ls -lah .
+      - run: ls -lah ./target/
+      - run: ls -lah ./target/release
+      - run: ls -lah ./target/release/EasyEDA_to_KiCAD_Lib_UI
       - uses: actions/upload-artifact@master
         with:
           name: ${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-${{ matrix.target }}
