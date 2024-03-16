@@ -963,12 +963,13 @@ dependencies = [
 
 [[package]]
 name = "easyeda_to_kicad_lib_ui"
-version = "1.1.2"
+version = "1.2.0"
 dependencies = [
  "arboard",
  "downloader",
  "eframe",
  "egui",
+ "egui-dropdown",
  "egui_extras",
  "env_logger",
  "glob",
@@ -1044,6 +1045,14 @@ dependencies = [
  "nohash-hasher",
  "ron",
  "serde",
+]
+
+[[package]]
+name = "egui-dropdown"
+version = "0.7.0"
+source = "git+https://github.com/markusdd/egui-dropdown.git?branch=master#5792fc54bbef79f1dd90f7db944ca075f4a039c0"
+dependencies = [
+ "egui",
 ]
 
 [[package]]

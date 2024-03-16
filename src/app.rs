@@ -1,4 +1,5 @@
 use std::{
+    collections::VecDeque,
     fs::{create_dir_all, read_to_string},
     path::Path,
 };
@@ -6,6 +7,7 @@ use std::{
 use arboard::Clipboard;
 use downloader::{Download, Downloader};
 use egui::{TextEdit, Vec2, Window};
+use egui_dropdown::DropDownBox;
 use egui_extras::{Column, TableBuilder};
 use glob::glob;
 use indexmap::{indexmap, IndexMap};
@@ -32,6 +34,7 @@ pub struct MyApp {
     skip_existing: bool,
     no_footprint: bool,
     no_symbol: bool,
+    history: VecDeque<String>,
     #[serde(skip)]
     tempdir: Option<TempDir>,
     #[serde(skip)]
@@ -60,6 +63,7 @@ impl Default for MyApp {
             skip_existing: false,
             no_footprint: false,
             no_symbol: false,
+            history: VecDeque::with_capacity(11),
             tempdir: TempDir::new("easyedatokicadlib").ok(),
             settings_open: false,
             is_init: false,
@@ -273,12 +277,28 @@ impl eframe::App for MyApp {
             ui.vertical(|ui| {
                 ui.horizontal(|ui| {
                     ui.label("LCSC number or part URL: ");
-                    ui.add(TextEdit::singleline(&mut self.part).desired_width(800.0));
+                    // ui.add(TextEdit::singleline(&mut self.part).desired_width(800.0));
+
+                    ui.add(
+                        DropDownBox::from_iter(
+                            &self.history,
+                            "searchbox",
+                            &mut self.part,
+                            |ui, text| ui.selectable_label(false, text),
+                        )
+                        .desired_width(800.0)
+                        .select_on_focus(true)
+                        .filter_by_input(false),
+                    );
+
                     if ui.button("Search").clicked() {
                         self.part = self.part.trim().to_owned();
                         if let Some(tabledata) = Self::get_part(self.part.as_str()) {
                             self.current_part = tabledata;
                             self.search_good = true;
+                            // handle history
+                            self.history.push_front(self.part.clone());
+                            self.history.truncate(10);
                         } else {
                             self.search_good = false;
                         }
