@@ -347,12 +347,18 @@ impl eframe::App for MyApp {
                                         let _ = create_dir_all(dlpath);
                                     }
                                     if let Some(url) = self.current_part.get("meta_datasheeturl") {
+                                        // the datasheet url points to an integrated parts view frame with an embedded pdf viewer
+                                        // we need to modify it for the download of the actual file
+                                        // https://datasheet.lcsc.com/lcsc/2206010216_UNI-ROYAL-Uniroyal-Elec-0402WGF1001TCE_C11702.pdf
+                                        // https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2206010216_UNI-ROYAL-Uniroyal-Elec-0402WGF1001TCE_C11702.pdf
                                         let dl = Downloader::builder()
                                             .download_folder(&dlpath)
                                             .build()
                                             .ok();
+                                        let pdf_url = url.replace("https://datasheet.lcsc.com/lcsc", "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc");
+                                        // debug only println!("PDF-URL: {}", pdf_url);
                                         if let Some(mut dl) = dl {
-                                            let _ = dl.download(&[Download::new(url)]);
+                                            let _ = dl.download(&[Download::new(&pdf_url)]);
                                         }
                                     }
                                 }
