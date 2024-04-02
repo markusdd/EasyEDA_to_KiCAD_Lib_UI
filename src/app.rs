@@ -503,7 +503,10 @@ impl eframe::App for MyApp {
 
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
                 powered_by(ui);
-                ui.label(format!("Version: v{}", VERSION));
+                ui.hyperlink_to(
+                    format!("Version: v{VERSION}"),
+                    format!("https://github.com/markusdd/EasyEDA_to_KiCAD_Lib_UI/releases/tag/v{VERSION}"),
+                );
                 egui::warn_if_debug_build(ui);
             });
 
