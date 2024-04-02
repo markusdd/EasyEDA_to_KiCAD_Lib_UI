@@ -30,7 +30,7 @@ so if you commit to using the part use the "Add to Library" function to permanen
 ## How to get going
 
 You can clone this repository and just run `cargo build --release`, provided you have rust installed (use `rustup`, it's easy).
-(release builds will be provided in the future)
+The Releases section has automatically built releases for Mac ARM64 and x86_64, Windows x86_64 and Linux x86_64.
 
 Also, you need https://github.com/TousstNicolas/JLC2KiCad_lib
 installed on your machine. Install instructions are provided at the linked repo, easiest option is probably via `pip` if Python is already installed.
