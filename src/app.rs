@@ -13,7 +13,7 @@ use glob::glob;
 use indexmap::{indexmap, IndexMap};
 use regex::Regex;
 use subprocess::Exec;
-use tempdir::TempDir;
+use tempfile::{Builder, TempDir};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -64,7 +64,7 @@ impl Default for MyApp {
             no_footprint: false,
             no_symbol: false,
             history: VecDeque::with_capacity(11),
-            tempdir: TempDir::new("easyedatokicadlib").ok(),
+            tempdir: Builder::new().prefix("easyedatokicadlib").tempdir().ok(),
             settings_open: false,
             is_init: false,
             search_good: true,
@@ -263,7 +263,7 @@ impl eframe::App for MyApp {
                 });
                 ui.add_space(16.0);
 
-                egui::widgets::global_dark_light_mode_buttons(ui);
+                egui::widgets::global_theme_preference_buttons(ui);
             });
         });
 
@@ -488,6 +488,10 @@ impl eframe::App for MyApp {
                             Window::new("")
                                 .auto_sized()
                                 .interactable(false)
+                                .order(egui::Order::Foreground)
+                                .fade_in(false)
+                                .fade_out(false)
+                                .collapsible(false)
                                 .show(ctx, |ui| {
                                     ui.add(
                                         egui::Image::new(url)

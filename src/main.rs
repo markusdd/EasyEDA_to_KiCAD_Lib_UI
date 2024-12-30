@@ -24,7 +24,7 @@ fn main() -> eframe::Result<()> {
             // This gives us image support:
             egui_extras::install_image_loaders(&cc.egui_ctx);
 
-            Box::new(easyeda_to_kicad_lib_ui::MyApp::new(cc))
+            Ok(Box::new(easyeda_to_kicad_lib_ui::MyApp::new(cc)))
         }),
     )
 }
