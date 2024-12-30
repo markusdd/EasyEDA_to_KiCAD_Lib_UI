@@ -484,7 +484,7 @@ impl eframe::App for MyApp {
                     for url in imagevec {
                         let img = ui
                             .add(egui::Image::new(url).fit_to_exact_size(Vec2::new(200.0, 200.0)));
-                        if img.hovered() {
+                        if is_hover_rect(ui, img.rect) {
                             Window::new("")
                                 .auto_sized()
                                 .interactable(false)
@@ -494,8 +494,7 @@ impl eframe::App for MyApp {
                                 .collapsible(false)
                                 .show(ctx, |ui| {
                                     ui.add(
-                                        egui::Image::new(url)
-                                            .fit_to_exact_size(Vec2::new(900.0, 900.0)),
+                                        egui::Image::new(url).fit_to_exact_size(Vec2::new(900.0, 900.0)),
                                     );
                                 });
                         }
@@ -567,6 +566,15 @@ impl eframe::App for MyApp {
             }
         });
     }
+}
+
+pub fn is_hover_rect(ui: &egui::Ui, rect: egui::Rect) -> bool {
+    let pointer_pos = ui.input(|i| i.pointer.hover_pos());
+    let Some(pos) = pointer_pos else {
+        return false;
+    };
+
+    rect.contains(pos)
 }
 
 fn powered_by(ui: &mut egui::Ui) {
