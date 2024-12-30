@@ -219,7 +219,7 @@ impl MyApp {
             }
         }
         // if we fall through to here, we failed getting data somewhere along the way
-        return None;
+        None
     }
 }
 
@@ -255,10 +255,8 @@ impl eframe::App for MyApp {
                     if ui.button("Settings").clicked() {
                         self.settings_open = true;
                     }
-                    if !is_web {
-                        if ui.button("Quit").clicked() {
-                            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                        }
+                    if !is_web && ui.button("Quit").clicked() {
+                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                     }
                 });
                 ui.add_space(16.0);
@@ -352,7 +350,7 @@ impl eframe::App for MyApp {
                                         // https://datasheet.lcsc.com/lcsc/2206010216_UNI-ROYAL-Uniroyal-Elec-0402WGF1001TCE_C11702.pdf
                                         // https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2206010216_UNI-ROYAL-Uniroyal-Elec-0402WGF1001TCE_C11702.pdf
                                         let dl = Downloader::builder()
-                                            .download_folder(&dlpath)
+                                            .download_folder(dlpath)
                                             .build()
                                             .ok();
                                         let pdf_url = url.replace("https://datasheet.lcsc.com/lcsc", "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc");
@@ -397,14 +395,11 @@ impl eframe::App for MyApp {
                                             for p in paths {
                                                 match p {
                                                     Ok(path) => {
-                                                        if let Some(mut clipboard) =
-                                                            Clipboard::new().ok()
+                                                        if let Ok(mut clipboard) = Clipboard::new()
                                                         {
-                                                            if let Some(contents) =
-                                                                read_to_string(path).ok()
+                                                            if let Ok(contents) = read_to_string(path)
                                                             {
-                                                                let _ =
-                                                                    clipboard.set_text(contents);
+                                                                let _ = clipboard.set_text(contents);
                                                             }
                                                         }
                                                     }
