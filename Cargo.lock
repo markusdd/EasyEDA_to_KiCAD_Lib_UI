@@ -1016,6 +1016,7 @@ dependencies = [
  "image",
  "indexmap",
  "log",
+ "nix 0.29.0",
  "once_cell",
  "regex",
  "reqwest",
