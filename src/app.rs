@@ -199,10 +199,19 @@ impl MyApp {
                             if let Some(imagevec) = imagelist.as_array() {
                                 for (idx, i) in imagevec.iter().enumerate() {
                                     if let Some(imageurl) = i.get("productBigImage") {
-                                        tabledata.insert(
-                                            format!("meta_image{}", idx),
-                                            imageurl.to_string().trim_matches('"').to_owned(),
-                                        );
+                                        if imageurl.is_null() {
+                                            if let Some(imageid) = i.get("productBigImageAccessId")
+                                            {
+                                                let apiurl = format!("https://jlcpcb.com/api/file/downloadByFileSystemAccessId/{}.jpg", imageid.to_string().trim_matches('"').to_owned());
+                                                tabledata
+                                                    .insert(format!("meta_image{}", idx), apiurl);
+                                            }
+                                        } else {
+                                            tabledata.insert(
+                                                format!("meta_image{}", idx),
+                                                imageurl.to_string().trim_matches('"').to_owned(),
+                                            );
+                                        }
                                     }
                                 }
                             }
