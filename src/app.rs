@@ -88,6 +88,52 @@ impl MyApp {
         Default::default()
     }
 
+    fn get_imglist(lcscnumber: &str, client: &reqwest::blocking::Client) -> Option<Vec<String>> {
+        // this is the fallback function for when JLCPCB gives us no images, then we resort to asking LCSC
+        let res_or_err = client
+            .get(format!(
+                "https://wmsc.lcsc.com/ftps/wm/product/detail?productCode={}",
+                lcscnumber
+            ))
+            .header(reqwest::header::ACCEPT, "application/json")
+            .header(
+                reqwest::header::USER_AGENT,
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:134.0) Gecko/20100101 Firefox/134.0",
+            )
+            .send();
+        if let Ok(res) = res_or_err {
+            if res.status().is_success() {
+                let pictext = res
+                    .text()
+                    .expect("Issue decoding received response from LCSC.");
+                let json: serde_json::Value =
+                    serde_json::from_str(&pictext).expect("Issue parsing search result JSON.");
+
+                // there is a case where we get a fully valid response in an HTML
+                // and JSON sense but it tells us via a code field in the JSON
+                // that no part could be found, in that case we return early with nothing
+                if let Some(code) = json.get("code") {
+                    if code != 200 {
+                        return None;
+                    }
+                }
+                let mut imglist = vec![];
+                if let Some(data) = json.get("result") {
+                    if let Some(imagelist) = data.get("productImages") {
+                        if let Some(imagevec) = imagelist.as_array() {
+                            for img in imagevec.iter() {
+                                imglist.push(img.to_string().trim_matches('"').to_owned());
+                            }
+                            return Some(imglist);
+                        }
+                    }
+                }
+            }
+        }
+        // if we fall through to here, we failed getting data somewhere along the way
+        None
+    }
+
     fn get_part(search_term: &str) -> Option<IndexMap<String, String>> {
         let term = search_term.trim();
         let re_jlc = Regex::new(r"/(C\d+)$").unwrap();
@@ -199,13 +245,26 @@ impl MyApp {
                             if let Some(imagevec) = imagelist.as_array() {
                                 for (idx, i) in imagevec.iter().enumerate() {
                                     if let Some(imageurl) = i.get("productBigImage") {
+                                        // this is a f*ed up case where JLC returns API IDs instead of URLs
                                         if imageurl.is_null() {
-                                            if let Some(imageid) = i.get("productBigImageAccessId")
+                                            // this does not work right now because of MIME type issues, get from LCSC instead
+                                            // if let Some(imageid) = i.get("productBigImageAccessId")
+                                            // {
+                                            //     let apiurl = format!("https://jlcpcb.com/api/file/downloadByFileSystemAccessId/{}.jpg", imageid.to_string().trim_matches('"').to_owned());
+                                            //     tabledata
+                                            //         .insert(format!("meta_image{}", idx), apiurl);
+                                            // }
+                                            if let Some(lcsc_imglist) =
+                                                MyApp::get_imglist(lcscnumber, &client)
                                             {
-                                                let apiurl = format!("https://jlcpcb.com/api/file/downloadByFileSystemAccessId/{}.jpg", imageid.to_string().trim_matches('"').to_owned());
-                                                tabledata
-                                                    .insert(format!("meta_image{}", idx), apiurl);
+                                                for (idx, i) in lcsc_imglist.iter().enumerate() {
+                                                    tabledata.insert(
+                                                        format!("meta_image{}", idx),
+                                                        i.to_owned(),
+                                                    );
+                                                }
                                             }
+                                            break;
                                         } else {
                                             tabledata.insert(
                                                 format!("meta_image{}", idx),
