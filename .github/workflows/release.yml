@@ -200,7 +200,7 @@ jobs:
         with:
           name: ${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-${{ matrix.target }}
           path: |
-            ${{ matrix.target == 'universal-apple-darwin' && format('EasyEDA_to_KiCAD_Lib_UI-{0}.dmg', steps.get_version.outputs.VERSION) || format('./target/release/easyeda_to_kicad_lib_ui{0}', matrix.suffix) }}
+            ${{ matrix.target == 'universal-apple-darwin' && format('EasyEDA_to_KiCAD_Lib_UI-{0}.dmg', steps.get_version.outputs.VERSION) || format('./target/{1}release/easyeda_to_kicad_lib_ui{0}', matrix.suffix, matrix.target == 'x86_64-unknown-linux-gnu' && 'x86_64-unknown-linux-gnu/' || '') }}
 
   release:
     needs:
