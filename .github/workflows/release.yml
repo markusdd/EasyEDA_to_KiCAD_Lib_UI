@@ -1,7 +1,8 @@
-'on':
+on:
   push:
     tags:
       - 'v*'
+
 jobs:
   version:
     runs-on: ubuntu-latest
@@ -16,25 +17,26 @@ jobs:
         with:
           name: version
           path: ./version/version
+
   build:
     needs:
       - version
-    runs-on: '${{ matrix.os }}'
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
           - os: macos-latest
-            target: x86_64-apple-darwin
-            suffix: ''
-          - os: macos-14
-            target: aarch64-apple-darwin
-            suffix: ''
+            target: universal-apple-darwin
+            suffix: .dmg
+            use_docker: false
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             suffix: ''
+            use_docker: true
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             suffix: .exe
+            use_docker: false
     steps:
       - uses: actions/checkout@master
         with:
@@ -45,37 +47,161 @@ jobs:
       - uses: actions/download-artifact@master
         with:
           name: version
+          path: ./version
       - id: get_version
         run: echo "VERSION=$(cat ./version/version)" >> $GITHUB_OUTPUT
         shell: bash
-      - uses: actions/cache@master
-        with:
-          path: ~/.cargo/registry
-          key: '${{ runner.os }}-cargo-registry-${{ hashFiles(''**/Cargo.lock'') }}'
-      - uses: actions/cache@master
-        with:
-          path: ~/.cargo/git
-          key: '${{ runner.os }}-cargo-index-${{ hashFiles(''**/Cargo.lock'') }}'
-      - uses: actions/cache@master
-        with:
-          path: target
-          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-      - uses: actions-rs/toolchain@v1
+      - name: Set up Docker for Linux build
+        if: ${{ matrix.use_docker }}
+        run: |
+          echo "Running Linux build in Docker container"
+      - name: Build Linux binary in Docker
+        if: ${{ matrix.use_docker }}
+        run: |
+          docker run --rm -v $(pwd):/usr/src/easyeda_to_kicad_lib_ui -w /usr/src/easyeda_to_kicad_lib_ui rockylinux:8 /bin/bash -c '
+            dnf install -y epel-release &&
+            dnf config-manager --set-enabled powertools &&
+            dnf groupinstall -y "Development Tools" &&
+            dnf install -y curl clang clang-devel libxkbcommon-devel mesa-libGL-devel libX11-devel \
+                           wayland-devel libpng-devel libjpeg-devel openssl-devel pkgconf-pkg-config &&
+            curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.82.0 &&
+            source $HOME/.cargo/env &&
+            rustc --version &&
+            ls -l /usr/lib64/libclang* &&
+            export LIBCLANG_PATH=/usr/lib64 &&
+            cargo build --release --target x86_64-unknown-linux-gnu &&
+            ldd --version &&
+            objdump -p target/x86_64-unknown-linux-gnu/release/easyeda_to_kicad_lib_ui | grep GLIBC
+          '
+      - name: Install Rust toolchain (non-Docker)
+        if: ${{ !matrix.use_docker }}
+        uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
-      - uses: actions-rs/cargo@v1
+      - name: Cache Rust dependencies (non-Docker)
+        if: ${{ !matrix.use_docker }}
+        uses: actions/cache@master
+        with:
+          path: ~/.cargo/registry
+          key: '${{ runner.os }}-cargo-registry-${{ hashFiles(''**/Cargo.lock'') }}'
+      - name: Cache Rust git index (non-Docker)
+        if: ${{ !matrix.use_docker }}
+        uses: actions/cache@master
+        with:
+          path: ~/.cargo/git
+          key: '${{ runner.os }}-cargo-index-${{ hashFiles(''**/Cargo.lock'') }}'
+      - name: Cache build target (non-Docker)
+        if: ${{ !matrix.use_docker }}
+        uses: actions/cache@master
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+      - name: Install dependencies for macOS DMG
+        if: ${{ matrix.target == 'universal-apple-darwin' }}
+        run: |
+          brew install imagemagick libpng create-dmg
+          npm install -g @electron-forge/cli
+      - name: Build macOS universal binary
+        if: ${{ matrix.target == 'universal-apple-darwin' }}
+        run: |
+          rustup target add x86_64-apple-darwin aarch64-apple-darwin
+          cargo build --release --target x86_64-apple-darwin
+          cargo build --release --target aarch64-apple-darwin
+          lipo -create -output target/release/easyeda_to_kicad_lib_ui \
+            target/x86_64-apple-darwin/release/easyeda_to_kicad_lib_ui \
+            target/aarch64-apple-darwin/release/easyeda_to_kicad_lib_ui
+          chmod +x target/release/easyeda_to_kicad_lib_ui
+      - name: Convert SVG to ICNS
+        if: ${{ matrix.target == 'universal-apple-darwin' }}
+        run: |
+          mkdir -p icon.iconset
+          mkdir -p icon-dmg.iconset
+          # Generate high-quality PNGs for application ICNS
+          convert -background none -density 300 -resize 16x16 assets/cpu.svg icon.iconset/icon_16x16.png
+          convert -background none -density 300 -resize 32x32 assets/cpu.svg icon.iconset/icon_16x16@2x.png
+          convert -background none -density 300 -resize 32x32 assets/cpu.svg icon.iconset/icon_32x32.png
+          convert -background none -density 300 -resize 64x64 assets/cpu.svg icon.iconset/icon_32x32@2x.png
+          convert -background none -density 300 -resize 128x128 assets/cpu.svg icon.iconset/icon_128x128.png
+          convert -background none -density 300 -resize 256x256 assets/cpu.svg icon.iconset/icon_128x128@2x.png
+          convert -background none -density 300 -resize 256x256 assets/cpu.svg icon.iconset/icon_256x256.png
+          convert -background none -density 300 -resize 512x512 assets/cpu.svg icon.iconset/icon_256x256@2x.png
+          convert -background none -density 300 -resize 512x512 assets/cpu.svg icon.iconset/icon_512x512.png
+          convert -background none -density 300 -resize 1024x1024 assets/cpu.svg icon.iconset/icon_512x512@2x.png
+          iconutil -c icns icon.iconset -o assets/EasyEDA_to_KiCAD_Lib_UI.icns
+          # Generate high-quality PNGs for DMG ICNS
+          convert -background none -density 300 -resize 16x16 assets/cpu.svg icon-dmg.iconset/icon_16x16.png
+          convert -background none -density 300 -resize 32x32 assets/cpu.svg icon-dmg.iconset/icon_16x16@2x.png
+          convert -background none -density 300 -resize 32x32 assets/cpu.svg icon-dmg.iconset/icon_32x32.png
+          convert -background none -density 300 -resize 64x64 assets/cpu.svg icon-dmg.iconset/icon_32x32@2x.png
+          convert -background none -density 300 -resize 128x128 assets/cpu.svg icon-dmg.iconset/icon_128x128.png
+          convert -background none -density 300 -resize 256x256 assets/cpu.svg icon-dmg.iconset/icon_128x128@2x.png
+          convert -background none -density 300 -resize 256x256 assets/cpu.svg icon-dmg.iconset/icon_256x256.png
+          convert -background none -density 300 -resize 512x512 assets/cpu.svg icon-dmg.iconset/icon_256x256@2x.png
+          convert -background none -density 300 -resize 512x512 assets/cpu.svg icon-dmg.iconset/icon_512x512.png
+          convert -background none -density 300 -resize 1024x1024 assets/cpu.svg icon-dmg.iconset/icon_512x512@2x.png
+          iconutil -c icns icon-dmg.iconset -o assets/EasyEDA_to_KiCAD_Lib_UI-dmg.icns
+      - name: Create macOS app bundle
+        if: ${{ matrix.target == 'universal-apple-darwin' }}
+        run: |
+          mkdir -p EasyEDA_to_KiCAD_Lib_UI.app/Contents/MacOS
+          mkdir -p EasyEDA_to_KiCAD_Lib_UI.app/Contents/Resources
+          cp target/release/easyeda_to_kicad_lib_ui EasyEDA_to_KiCAD_Lib_UI.app/Contents/MacOS/EasyEDA_to_KiCAD_Lib_UI
+          cp assets/EasyEDA_to_KiCAD_Lib_UI.icns EasyEDA_to_KiCAD_Lib_UI.app/Contents/Resources/EasyEDA_to_KiCAD_Lib_UI.icns
+          cat << EOF > EasyEDA_to_KiCAD_Lib_UI.app/Contents/Info.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleExecutable</key>
+            <string>EasyEDA_to_KiCAD_Lib_UI</string>
+            <key>CFBundleIconFile</key>
+            <string>EasyEDA_to_KiCAD_Lib_UI</string>
+            <key>CFBundleIdentifier</key>
+            <string>com.example.EasyEDA_to_KiCAD_Lib_UI</string>
+            <key>CFBundleName</key>
+            <string>EasyEDA_to_KiCAD_Lib_UI</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>CFBundleVersion</key>
+            <string>${{ steps.get_version.outputs.VERSION }}</string>
+            <key>LSMinimumSystemVersion</key>
+            <string>10.13</string>
+          </dict>
+          </plist>
+          EOF
+      - name: Create DMG
+        if: ${{ matrix.target == 'universal-apple-darwin' }}
+        run: |
+          create-dmg \
+            --volname "EasyEDA_to_KiCAD_Lib_UI" \
+            --volicon "assets/EasyEDA_to_KiCAD_Lib_UI-dmg.icns" \
+            --window-pos 200 120 \
+            --window-size 800 400 \
+            --icon-size 100 \
+            --icon "EasyEDA_to_KiCAD_Lib_UI.app" 200 190 \
+            --hide-extension "EasyEDA_to_KiCAD_Lib_UI.app" \
+            --app-drop-link 600 185 \
+            "EasyEDA_to_KiCAD_Lib_UI-${{ steps.get_version.outputs.VERSION }}.dmg" \
+            "EasyEDA_to_KiCAD_Lib_UI.app"
+          ls -l *.dmg
+      - name: Build (non-Docker, non-macOS)
+        if: ${{ !matrix.use_docker && matrix.target != 'universal-apple-darwin' }}
+        uses: actions-rs/cargo@v1
         env:
           VERSION: '${{ steps.get_version.outputs.VERSION }}'
           REPOSITORY_NAME: '${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}'
         with:
           command: build
           args: '--release'
-      - uses: actions/upload-artifact@master
+      - name: Upload artifact
+        uses: actions/upload-artifact@master
         with:
           name: ${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-${{ matrix.target }}
-          path: ./target/release/easyeda_to_kicad_lib_ui${{ matrix.suffix }}
+          path: |
+            ${{ matrix.target == 'universal-apple-darwin' && format('EasyEDA_to_KiCAD_Lib_UI-{0}.dmg', steps.get_version.outputs.VERSION) || format('./target/release/easyeda_to_kicad_lib_ui{0}', matrix.suffix) }}
+
   release:
     needs:
       - build
@@ -90,9 +216,9 @@ jobs:
       - uses: actions/download-artifact@master
         with:
           name: version
-      - run: ls -lah
+          path: ./version
       - id: get_version
-        run: 'echo "VERSION=$(cat ./version)" >> $GITHUB_OUTPUT'
+        run: echo "VERSION=$(cat ./version/version)" >> $GITHUB_OUTPUT
         shell: bash
       - uses: actions/download-artifact@master
         with:
@@ -100,17 +226,13 @@ jobs:
           path: ./${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-x86_64-unknown-linux-gnu/
       - uses: actions/download-artifact@master
         with:
-          name: ${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-x86_64-apple-darwin
-          path: ./${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-x86_64-apple-darwin/
-      - uses: actions/download-artifact@master
-        with:
-          name: ${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-aarch64-apple-darwin
-          path: ./${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-aarch64-apple-darwin/
+          name: ${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-universal-apple-darwin
+          path: ./${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-universal-apple-darwin/
       - uses: actions/download-artifact@master
         with:
           name: ${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-x86_64-pc-windows-msvc
           path: ./${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-x86_64-pc-windows-msvc/
-      - run: ls -lah
+      - run: ls -lah ./${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-universal-apple-darwin/
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -138,23 +260,14 @@ jobs:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         with:
           upload_url: '${{ steps.create_release.outputs.upload_url }}'
-          asset_path: ./${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-x86_64-apple-darwin/easyeda_to_kicad_lib_ui
-          asset_name: ${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-x86_64-apple-darwin
-          asset_content_type: application/octet-stream
-      - uses: actions/upload-release-asset@latest
-        env:
-          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-        with:
-          upload_url: '${{ steps.create_release.outputs.upload_url }}'
-          asset_path: ./${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-aarch64-apple-darwin/easyeda_to_kicad_lib_ui
-          asset_name: ${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-aarch64-apple-darwin
-          asset_content_type: application/octet-stream
+          asset_path: ./${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-universal-apple-darwin/EasyEDA_to_KiCAD_Lib_UI-${{ steps.get_version.outputs.VERSION }}.dmg
+          asset_name: ${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-universal-apple-darwin.dmg
+          asset_content_type: application/x-diskcopy
       - uses: actions/upload-release-asset@latest
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         with:
           upload_url: '${{ steps.create_release.outputs.upload_url }}'
           asset_path: ./${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-x86_64-pc-windows-msvc/easyeda_to_kicad_lib_ui.exe
-          asset_name:  ${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-x86_64-pc-windows-msvc.exe
+          asset_name: ${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-x86_64-pc-windows-msvc.exe
           asset_content_type: application/octet-stream
-          
