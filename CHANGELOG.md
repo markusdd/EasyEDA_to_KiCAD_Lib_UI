@@ -1,8 +1,12 @@
 # Changelog
 
+## 1.4.0
+
+- WIP
+
 ## 1.3.9
 
-- TBD
+- fix and rework datasheet download to remove openssl dependency completely
 
 ## 1.3.8
 

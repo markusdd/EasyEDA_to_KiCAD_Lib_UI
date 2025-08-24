@@ -1,11 +1,11 @@
 use std::{
     collections::VecDeque,
-    fs::{create_dir_all, read_to_string},
+    fs::{create_dir_all, read_to_string, File},
+    io::Write,
     path::Path,
 };
 
 use arboard::Clipboard;
-use downloader::{Download, Downloader};
 use egui::{TextEdit, Vec2, Window};
 use egui_dropdown::DropDownBox;
 use egui_extras::{Column, TableBuilder};
@@ -13,7 +13,6 @@ use glob::glob;
 use indexmap::{indexmap, IndexMap};
 use regex::Regex;
 use subprocess::Exec;
-use tempfile::{Builder, TempDir};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -36,7 +35,7 @@ pub struct MyApp {
     no_symbol: bool,
     history: VecDeque<String>,
     #[serde(skip)]
-    tempdir: Option<TempDir>,
+    tempdir: Option<tempfile::TempDir>,
     #[serde(skip)]
     settings_open: bool,
     #[serde(skip)]
@@ -64,7 +63,7 @@ impl Default for MyApp {
             no_footprint: false,
             no_symbol: false,
             history: VecDeque::with_capacity(11),
-            tempdir: Builder::new().prefix("easyedatokicadlib").tempdir().ok(),
+            tempdir: tempfile::Builder::new().prefix("easyedatokicadlib").tempdir().ok(),
             settings_open: false,
             is_init: false,
             search_good: true,
@@ -417,14 +416,30 @@ impl eframe::App for MyApp {
                                         // we need to modify it for the download of the actual file
                                         // https://datasheet.lcsc.com/lcsc/2206010216_UNI-ROYAL-Uniroyal-Elec-0402WGF1001TCE_C11702.pdf
                                         // https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2206010216_UNI-ROYAL-Uniroyal-Elec-0402WGF1001TCE_C11702.pdf
-                                        let dl = Downloader::builder()
-                                            .download_folder(dlpath)
-                                            .build()
-                                            .ok();
-                                        let pdf_url = url.replace("https://datasheet.lcsc.com/lcsc", "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc");
-                                        // debug only println!("PDF-URL: {}", pdf_url);
-                                        if let Some(mut dl) = dl {
-                                            let _ = dl.download(&[Download::new(&pdf_url)]);
+                                        let pdf_url = url.replace("https://www.lcsc.com/datasheet/lcsc_datasheet_", "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/");
+                                        println!("PDF-URL: {}", pdf_url); // Debug log
+                                        let filename = pdf_url.rsplit('/').next().unwrap_or(&format!("{}.pdf", curr_part)).to_string();
+                                        let dest_path = dlpath.join(filename);
+                                        let client = reqwest::blocking::Client::new();
+                                        if let Ok(response) = client
+                                            .get(&pdf_url)
+                                            .header(
+                                                reqwest::header::USER_AGENT,
+                                                "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:134.0) Gecko/20100101 Firefox/134.0",
+                                            )
+                                            .send()
+                                        {
+                                            let content_type = response
+                                                .headers()
+                                                .get(reqwest::header::CONTENT_TYPE)
+                                                .map(|v| v.to_str().unwrap_or("unknown"))
+                                                .unwrap_or("unknown");
+                                            println!("Content-Type: {}", content_type); // Debug log
+                                            if response.status().is_success() && content_type.contains("application/pdf") {
+                                                if let Ok(bytes) = response.bytes() {
+                                                    let _ = File::create(&dest_path).and_then(|mut file| file.write_all(&bytes));
+                                                }
+                                            }
                                         }
                                     }
                                 }
