@@ -1,6 +1,6 @@
 use std::{
     collections::VecDeque,
-    fs::{create_dir_all, read_to_string, File},
+    fs::{File, create_dir_all, read_to_string},
     io::Write,
     path::Path,
 };
@@ -10,7 +10,7 @@ use egui::{TextEdit, Vec2, Window};
 use egui_dropdown::DropDownBox;
 use egui_extras::{Column, TableBuilder};
 use glob::glob;
-use indexmap::{indexmap, IndexMap};
+use indexmap::{IndexMap, indexmap};
 use regex::Regex;
 use subprocess::Exec;
 
@@ -63,7 +63,10 @@ impl Default for MyApp {
             no_footprint: false,
             no_symbol: false,
             history: VecDeque::with_capacity(11),
-            tempdir: tempfile::Builder::new().prefix("easyedatokicadlib").tempdir().ok(),
+            tempdir: tempfile::Builder::new()
+                .prefix("easyedatokicadlib")
+                .tempdir()
+                .ok(),
             settings_open: false,
             is_init: false,
             search_good: true,
@@ -274,7 +277,24 @@ impl MyApp {
                                 }
                             }
                         }
-                        if let Some(datasheeturl) = data.get("dataManualUrl") {
+
+                        // This mess is because LCSC can or can not have an offical data sheet link directly to
+                        // the manufacturer, but sometimes the key also exists but is empty. In case it exists
+                        // and is valid we must take it, because then the other one just redirects to the product
+                        // page URL, leaving us without a datasheet that we can actually download. If it does
+                        // not exist the datasheet is actually stored at LCSC and the key in the else branch
+                        // does return a valid PDF. So yeah...
+                        if let Some(officialdatasheeturl) = data.get("dataManualOfficialLink")
+                            && officialdatasheeturl != ""
+                        {
+                            tabledata.insert(
+                                "meta_datasheeturl".to_owned(),
+                                officialdatasheeturl
+                                    .to_string()
+                                    .trim_matches('"')
+                                    .to_owned(),
+                            );
+                        } else if let Some(datasheeturl) = data.get("dataManualUrl") {
                             tabledata.insert(
                                 "meta_datasheeturl".to_owned(),
                                 datasheeturl.to_string().trim_matches('"').to_owned(),
@@ -316,7 +336,7 @@ impl eframe::App for MyApp {
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             // The top panel is often a good place for a menu bar:
 
-            egui::menu::bar(ui, |ui| {
+            egui::MenuBar::new().ui(ui, |ui| {
                 // NOTE: no File->Quit on web pages!
                 ui.menu_button("File", |ui| {
                     if ui.button("Settings").clicked() {
@@ -562,7 +582,7 @@ impl eframe::App for MyApp {
                     for url in imagevec {
                         let img = ui
                             .add(egui::Image::new(url).fit_to_exact_size(Vec2::new(200.0, 200.0)));
-                        if is_hover_rect(ui, img.rect) {
+                        if is_hover_rect(ui, img.rect) && !self.settings_open {
                             Window::new("")
                                 .auto_sized()
                                 .interactable(false)

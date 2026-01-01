@@ -1,8 +1,11 @@
 # Changelog
 
-## 1.4.0
+## 1.3.10
 
-- WIP
+- fix datasheet downloads yet again for certain parts that now use manufacturer URLs
+- general dependency update and upgrade to egui 0.33.3
+- fix a bug where picture preview would disturb an open settings window
+- move to Rust 1.91.0 and edition 2024
 
 ## 1.3.9
 
