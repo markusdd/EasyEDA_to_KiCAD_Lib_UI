@@ -1,4 +1,5 @@
 #![warn(clippy::all, rust_2018_idioms)]
+#![allow(clippy::collapsible_if)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 // When compiling natively:
