@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.11
+
+- TBD
+
 ## 1.3.10
 
 - fix datasheet downloads yet again for certain parts that now use manufacturer URLs
