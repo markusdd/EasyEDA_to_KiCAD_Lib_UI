@@ -2,7 +2,7 @@
 
 ## 1.3.11
 
-- TBD
+- maintenance only: upgrade to rust 1.92 and to egui 0.34.1, bump all other dependencies
 
 ## 1.3.10
 
