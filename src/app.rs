@@ -317,7 +317,7 @@ impl eframe::App for MyApp {
     }
 
     /// Called each time the UI needs repainting, which may be many times per second.
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         // Put your widgets into a `SidePanel`, `TopBottomPanel`, `CentralPanel`, `Window` or `Area`.
         // For inspiration and more examples, go to https://emilk.github.io/egui
         let is_web = cfg!(target_arch = "wasm32");
@@ -333,7 +333,7 @@ impl eframe::App for MyApp {
             self.is_init = true
         }
 
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
+        egui::Panel::top("top_panel").show_inside(ui, |ui| {
             // The top panel is often a good place for a menu bar:
 
             egui::MenuBar::new().ui(ui, |ui| {
@@ -343,7 +343,7 @@ impl eframe::App for MyApp {
                         self.settings_open = true;
                     }
                     if !is_web && ui.button("Quit").clicked() {
-                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                        ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
                     }
                 });
                 ui.add_space(16.0);
@@ -352,7 +352,7 @@ impl eframe::App for MyApp {
             });
         });
 
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default().show_inside(ui, |ui| {
             // The central panel the region left after adding TopPanel's and SidePanel's
             if is_web {
                 ui.heading("EasyEDA to KiCAD Library Converter");
@@ -425,7 +425,7 @@ impl eframe::App for MyApp {
                                 if self.no_symbol {
                                     args.push("--no_symbol");
                                 }
-                                let _ = Exec::cmd(&self.exe_path).args(&args).popen();
+                                let _ = Exec::cmd(&self.exe_path).args(&args).start();
                                 if self.download_datasheet {
                                     let dlpath = Path::new(&self.datasheet_dir);
                                     if !dlpath.is_dir() {
@@ -486,7 +486,7 @@ impl eframe::App for MyApp {
                                             "-model_dir",
                                             "packages3d",
                                         ];
-                                        let _ = Exec::cmd(&self.exe_path).args(&args).popen();
+                                        let _ = Exec::cmd(&self.exe_path).args(&args).start();
 
                                         // now copy the generated footprint to the clipboard
                                         let glob = glob(
@@ -590,7 +590,7 @@ impl eframe::App for MyApp {
                                 .fade_in(false)
                                 .fade_out(false)
                                 .collapsible(false)
-                                .show(ctx, |ui| {
+                                .show(ui.ctx(), |ui| {
                                     ui.add(
                                         egui::Image::new(url).fit_to_exact_size(Vec2::new(900.0, 900.0)),
                                     );
@@ -616,7 +616,7 @@ impl eframe::App for MyApp {
                 Window::new("Settings")
                     .auto_sized()
                     .interactable(true)
-                    .show(ctx, |ui| {
+                    .show(ui.ctx(), |ui| {
                         ui.vertical(|ui| {
                             ui.heading("Settings");
                             ui.checkbox(&mut self.download_datasheet, "Download datasheet");
