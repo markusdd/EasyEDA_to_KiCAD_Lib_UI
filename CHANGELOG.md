@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.12
+
+- maintenance: upgrade egui and other dependencies, fix cliippy workflow
+- TBD
+
 ## 1.3.11
 
 - maintenance only: upgrade to rust 1.92 and to egui 0.34.1, bump all other dependencies
